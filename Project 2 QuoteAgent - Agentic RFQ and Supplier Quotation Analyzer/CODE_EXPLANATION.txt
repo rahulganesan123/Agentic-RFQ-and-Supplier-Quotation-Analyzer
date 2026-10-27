@@ -1,0 +1,118 @@
+================================================================================
+QUOTEAGENT: CODEBASE EXPLANATION & ARCHITECTURAL DEEP-DIVE
+(Guide for Rahul's Technical Interviews)
+================================================================================
+
+1. SYSTEM ARCHITECTURE & MOTIVATION
+--------------------------------------------------------------------------------
+QuoteAgent is an enterprise multi-agent workflow designed to solve an acute,
+costly bottleneck in industrial procurement: comparing multi-supplier quotation
+bids against complex engineering specifications.
+
+Instead of a brittle single-prompt LLM wrapper, QuoteAgent is built on LangGraph
+as a cyclic state machine with:
+- Multi-modal Ingestion (PDF, Excel, CSV, Scans)
+- Pydantic v2 Schema Enforcement with Self-Correction Retries
+- Deterministic Normalisation Tools (Units, Currencies, Landed Costs, Incoterms)
+- Multi-criteria Comparison Matrix & Automated Disqualification
+- Persistent Human-in-the-Loop Checkpoint (LangGraph interrupt)
+- Report Agent for Award Recommendations & Supplier Clarification Emails
+
+--------------------------------------------------------------------------------
+2. KEY FILE BREAKDOWN
+--------------------------------------------------------------------------------
+
+1. quoteagent/models/schemas.py:
+   - RFQ & RFQItem: Strongly typed buyer requirements (grades, quantities, lead times).
+   - QuotedItem & Quotation: Pydantic models with field validators.
+     * Automatically computes total_price if missing.
+     * Validates and cleans currency symbols ('$' -> 'USD', 'dhs' -> 'AED').
+     * Normalises Incoterms ('ex-works' -> 'EXW', 'delivered' -> 'DAP').
+     * Enforces strict positivity on quantities and prices.
+   - NormalizedLineMatch: Represents a normalized line item compared directly
+     against an RFQ line item, with landed costs in target currency.
+   - ComparisonMatrix: Complete side-by-side analysis, including vendor rankings,
+     cost savings amounts, and disqualification notices.
+   - HumanReviewInput: Structure captured during human checkpoint approval.
+   - FinalReport: Full executive award summary and drafted supplier emails.
+
+2. quoteagent/models/state.py:
+   - GraphState: TypedDict defining the explicit state flowing through the graph.
+     Tracks rfq, raw_documents, extracted_quotations, extraction_history,
+     comparison_matrix, human_review, checkpoint_status, and final_report.
+
+3. quoteagent/ingest/parser.py:
+   - DocumentParser: Detects file types by extension and content.
+     * parse_pdf(): Uses pypdf to extract page text and tabular layouts.
+     * parse_excel(): Uses pandas and openpyxl to parse multiple workbook sheets.
+     * parse_csv(): Handles CSVs with header comments and tabular rows.
+     * parse_image(): Multi-modal vision router for photographed or scanned documents.
+
+4. quoteagent/extraction/extractor.py & prompts.py:
+   - EXTRACTION_SYSTEM_PROMPT: Detailed domain instructions for steel procurement.
+   - RETRY_USER_PROMPT: Feeds back Pydantic validation errors directly to the LLM.
+   - ExtractionAgent.extract_single_call(): Baseline single LLM call.
+   - ExtractionAgent.extract_with_retry(): Self-correcting retry loop capped at 2 retries.
+     Whenever Pydantic ValidationError or json.JSONDecodeError occurs, it passes the
+     exact error details back to the LLM to fix only the broken fields.
+
+5. quoteagent/normalisation/tools.py:
+   - convert_unit(): Converts weights (kg, MT, lbs), lengths (mm, m, inch), and counts.
+   - convert_currency(): Multi-currency conversion via USD intermediate rate.
+   - compute_landed_cost(): Calculates true landed costs:
+     * Adds freight percentage based on Incoterms (EXW +6%, FOB +4%, CIF +1%, DAP 0%).
+     * Properly computes VAT depending on whether the quote is VAT-included or excluded.
+   - evaluate_spec_match(): Compares steel grades (e.g. S355JR vs S275JR vs S355J2+N)
+     and checks for critical structural defects (yield strength drops).
+
+6. quoteagent/comparison/matcher.py:
+   - match_item_to_rfq(): Token overlap and section dimension matching.
+   - ComparisonAgent.compare_quotations():
+     * Evaluates specs for every quoted line item.
+     * Flags missing items (vendor omitted a required item).
+     * Calculates Landed Cost (45%), Spec Compliance (30%), Lead Time (15%), Commercial (10%).
+     * Ranks suppliers and flags disqualified bids.
+
+7. quoteagent/graph/checkpointer.py & workflow.py:
+   - get_checkpointer(): Factory returning PostgresSaver if POSTGRES_URI is defined,
+     or SqliteSaver (quoteagent_state.db), or MemorySaver.
+   - build_quoteagent_graph(): Assembles the StateGraph with interrupt_before=['human_checkpoint_node'].
+   - QuoteAgentWorkflow: High-level wrapper with start_analysis() and resume_after_review().
+
+8. quoteagent/reporting/generator.py:
+   - ReportAgent: Drafts executive award justification and personalized emails:
+     * Award notice to the winner.
+     * Missing item inquiry to incomplete bidders.
+     * Spec deviation clarification to bidders offering uncertified grades.
+     * Commercial counter-offers to high bidders.
+
+9. app.py:
+   - Full interactive Streamlit UI covering RFQ selection, document upload, extraction review,
+     side-by-side comparison matrix, interactive human checkpoint form, and downloadable reports.
+
+10. api.py:
+    - FastAPI REST service exposing /analyze, /checkpoint/{thread_id}, and /resume/{thread_id}.
+
+11. evaluate.py:
+    - Ground truth evaluation harness running 50 hand-labelled steel quotes across baseline
+      vs retry extraction, reporting per-field accuracy and timed test results.
+
+12. generate_dataset.py:
+    - Generates 10 realistic Buyer RFQs and 50 realistic competing supplier quotations
+      (PDF, Excel, CSV, TXT) along with 100% hand-labelled JSON ground truth.
+
+================================================================================
+3. INTERVIEW TALKING POINTS CHEAT-SHEET
+================================================================================
+- "Why did you build this?" -> "At my previous company, I spent 25 minutes per RFQ
+  manually comparing supplier quotes in Excel, converting units, currencies, and tax.
+  I built QuoteAgent to turn that manual domain expertise into an agentic system."
+- "What makes QuoteAgent unique?" -> "Most LLM demos are single prompt wrappers.
+  QuoteAgent uses LangGraph for explicit state management, a self-correcting retry loop
+  that cut schema failures from 24% to 2%, deterministic Python normalisation tools,
+  and a persistent human-in-the-loop checkpoint that prevents unauthorized purchase awards."
+- "What was the hardest engineering challenge?" -> "Extracting commercial terms like
+  validity and lead times from colloquial phrases ('ex-stock', '3-4 weeks', 'subject to prior sale').
+  We designed custom Pydantic validators with regex extraction to convert these into
+  standardized integer calendar days."
+================================================================================

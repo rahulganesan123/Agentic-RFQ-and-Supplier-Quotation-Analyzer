@@ -1,0 +1,80 @@
+{
+  "extraction_benchmark": {
+    "sample_count": 25,
+    "baseline_valid_rate": 100.0,
+    "retry_valid_rate": 100.0,
+    "baseline_invalid_rate": 0.0,
+    "retry_invalid_rate": 0.0,
+    "baseline_field_acc": {
+      "vendor_name": 40.0,
+      "currency": 80.0,
+      "incoterms": 80.0,
+      "payment_terms": 44.0,
+      "lead_time_days": 60.0,
+      "validity_days": 60.0,
+      "vat_included": 80.0,
+      "item_count": 44.0,
+      "line_quantity_acc": 44.0,
+      "line_unit_acc": 44.0,
+      "line_price_acc": 44.0,
+      "line_grade_acc": 4.0
+    },
+    "retry_field_acc": {
+      "vendor_name": 40.0,
+      "currency": 80.0,
+      "incoterms": 80.0,
+      "payment_terms": 40.0,
+      "lead_time_days": 60.0,
+      "validity_days": 60.0,
+      "vat_included": 80.0,
+      "item_count": 40.0,
+      "line_quantity_acc": 40.0,
+      "line_unit_acc": 40.0,
+      "line_price_acc": 40.0,
+      "line_grade_acc": 0.0
+    },
+    "baseline_overall_accuracy": 52.0,
+    "retry_overall_accuracy": 50.0,
+    "retry_distribution": {
+      "1": 25,
+      "2": 0,
+      "3": 0,
+      "failed": 0
+    }
+  },
+  "timed_test": {
+    "rfqs": [
+      {
+        "rfq_id": "RFQ-2026-001",
+        "project_name": "Warehouse Structural Steel Framework - DIC Package B",
+        "vendor_count": 5,
+        "manual_excel_minutes": 24.5,
+        "agent_processing_seconds": 0.9,
+        "human_review_seconds": 45.0,
+        "total_agent_minutes": 0.77,
+        "time_reduction_pct": 96.9
+      },
+      {
+        "rfq_id": "RFQ-2026-002",
+        "project_name": "Storage Tank & Pressure Vessel Shell Plates",
+        "vendor_count": 5,
+        "manual_excel_minutes": 24.5,
+        "agent_processing_seconds": 0.7,
+        "human_review_seconds": 45.0,
+        "total_agent_minutes": 0.76,
+        "time_reduction_pct": 96.9
+      },
+      {
+        "rfq_id": "RFQ-2026-003",
+        "project_name": "Offshore Platform Topside Tubular Package",
+        "vendor_count": 5,
+        "manual_excel_minutes": 24.5,
+        "agent_processing_seconds": 0.7,
+        "human_review_seconds": 45.0,
+        "total_agent_minutes": 0.76,
+        "time_reduction_pct": 96.9
+      }
+    ]
+  },
+  "timestamp": "2026-10-27 20:27:03"
+}
